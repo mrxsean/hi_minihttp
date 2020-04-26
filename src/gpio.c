@@ -111,6 +111,22 @@ int hi3518_adc_get(void)
 	return value;
 }
 
+int hi3518_pwm_set(int num)
+{
+	int value;
+
+	value = 0;
+	linux_write_memery(0x200F00F0, &value, 4);//端口复用
+	value = 2;
+	linux_write_memery(0x20030038, &value, 4);//向写 PERI_CRG14 写 0x2，选择 PWM 的时钟源为 3MHz，打开 PWM 时钟。
+	value = 1000;
+	linux_write_memery(0x20130040, &value, 4);//1000周期，3KHz
+	value = num;
+	linux_write_memery(0x20130044, &value, 4);//PWM 的高电平拍数
+	value = 5;
+	linux_write_memery(0x2013004C, &value, 4);//模块使能/正常输出方波/一直输出方波
+}
+
 bool set_u8(const uint32_t offset, const uint8_t value) {
 	int base_addr, addr_offset;
     int mem_fd = open("/dev/mem", O_RDWR | O_SYNC);

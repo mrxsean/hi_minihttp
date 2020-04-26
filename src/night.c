@@ -55,20 +55,28 @@ extern bool keepRunning;
 
 void* night_thread_func(void *vargp)  
 {
-    int adc_value = 0;
+    int adc_value = 0, night_mode = 0;
     usleep(1000);
     hi3518_adc_init();
     while (keepRunning)
     {
         adc_value = hi3518_adc_get();
         if(adc_value > app_config.ir_sensor_threshold){//ir_sensor_threshold
-            printf("Change mode to DAY\n");
-            ircut_off();
-        }else{
-            printf("Change mode to NIGHT\n");
-            ircut_on();
+            if(night_mode){
+                printf("Change mode to DAY\n");
+                ircut_off();
+            }
+            night_mode = 0;
         }
-        printf("hi3518_adc_get-> %d\r\n", adc_value);
+        else
+        {
+            if(!night_mode){
+                printf("Change mode to NIGHT\n");
+                ircut_on();
+            }
+            night_mode = 1;
+        }
+        // printf("hi3518_adc_get-> %d\r\n", adc_value);
         sleep(app_config.check_interval_s);
     }
 }

@@ -6,6 +6,8 @@
 !/src/**/*.h
 !/src/**/*.c
 !/minihttp.ini
+!/osdrv/include/*
+!/osdrv/lib/*
 
 !.dockerignore
 !.gitignore

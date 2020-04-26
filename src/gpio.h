@@ -49,3 +49,4 @@ bool get_pin_linux(const uint8_t pin_number, bool *value);
 
 int hi3518_adc_init(void);
 int hi3518_adc_get(void);
+int hi3518_pwm_set(int num);
