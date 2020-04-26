@@ -38,6 +38,7 @@ enum ConfigError parse_app_config(const char *path) {
 
     app_config.night_mode_enable = false;
     app_config.ir_sensor_pin = 999;
+    app_config.ir_sensor_threshold = 150;
     app_config.ir_cut_pin1 = 999;
     app_config.ir_cut_pin2 = 999;
     app_config.pin_switch_delay_us = 250;
@@ -83,6 +84,7 @@ enum ConfigError parse_app_config(const char *path) {
     if (app_config.night_mode_enable) {
         #define PIN_MAX 95
         err = parse_int(&ini, "night_mode", "ir_sensor_pin", 0, PIN_MAX, &app_config.ir_sensor_pin); if(err != CONFIG_OK) goto RET_ERR;
+        err = parse_int(&ini, "night_mode", "ir_sensor_threshold", 0, 255, &app_config.ir_sensor_threshold); if(err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "night_mode", "check_interval_s", 0, 600, &app_config.check_interval_s); if(err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "night_mode", "ir_cut_pin1", 0, PIN_MAX, &app_config.ir_cut_pin1); if(err != CONFIG_OK) goto RET_ERR;
         err = parse_int(&ini, "night_mode", "ir_cut_pin2", 0, PIN_MAX, &app_config.ir_cut_pin2); if(err != CONFIG_OK) goto RET_ERR;

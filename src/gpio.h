@@ -46,3 +46,6 @@ bool pin_linux_to_port_pin(const uint8_t pin_number, uint8_t *port, uint8_t *pin
 
 bool set_pin_linux(const uint8_t pin_number, const bool bit);
 bool get_pin_linux(const uint8_t pin_number, bool *value);
+
+int hi3518_adc_init(void);
+int hi3518_adc_get(void);

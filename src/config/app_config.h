@@ -58,6 +58,7 @@ struct AppConfig {
     uint32_t ir_cut_pin1;
     uint32_t ir_cut_pin2;
     uint32_t ir_sensor_pin;
+    uint32_t ir_sensor_threshold;
     uint32_t check_interval_s;
     uint32_t pin_switch_delay_us;
 };

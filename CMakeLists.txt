@@ -4,15 +4,14 @@ project(minihttp C)
 # set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_FLAGS "-std=gnu99")
 
+
 include_directories(
     ./src/
-    ${CMAKE_PREFIX_PATH}/usr/include/hisi-osdrv2/
-    ${CMAKE_PREFIX_PATH}/usr/include/hidrv/
+    /home/sean/Develop/hi3518/chaos_calmer/staging_dir/target-arm_arm926ej-s_uClibc-0.9.33.2_eabi/usr/include/hisi-osdrv2
 )
 
 link_directories(
-    ${CMAKE_PREFIX_PATH}/usr/lib/hisi-osdrv2/
-    ${CMAKE_PREFIX_PATH}/usr/lib/hidrv/
+    /home/sean/Develop/hi3518/chaos_calmer/staging_dir/target-arm_arm926ej-s_uClibc-0.9.33.2_eabi/usr/lib
 )
 
 set(HILIBS

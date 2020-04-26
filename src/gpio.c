@@ -32,16 +32,99 @@ bool pin_linux_to_port_pin(const uint8_t pin_number, uint8_t *port, uint8_t *pin
     return true;
 }
 
+int linux_read_memery(int addr, void *data, int num)
+{
+	int fd, base_addr, offset;
+
+	offset = addr % 0x1000;
+	base_addr = addr - offset;
+	fd = open("/dev/mem", O_RDWR | O_NDELAY);
+
+	if (fd < 0)
+	{
+		printf("open(/dev/mem) failed.");
+		return 0;
+	}
+	unsigned char *map_base = (unsigned char *)mmap(NULL, offset + num, PROT_READ | PROT_WRITE, MAP_SHARED, fd, base_addr);
+	if (map_base == MAP_FAILED)
+	{
+		printf("linux_read_memery Error: %s (%d)\n", strerror(errno), errno);
+		close(fd);
+		return false;
+	}
+	memcpy(data, map_base + offset, num);
+	if (fd)
+		close(fd);
+
+	munmap(map_base, num); //解除映射关系
+	return num;
+}
+
+int linux_write_memery(int addr, void *data, int num)
+{
+	int fd, base_addr, offset;
+
+	offset = addr % 0x1000;
+	base_addr = addr - offset;
+	fd = open("/dev/mem", O_RDWR | O_NDELAY);
+
+	if (fd < 0)
+	{
+		printf("open(/dev/mem) failed.");
+		return 0;
+	}
+	unsigned char *map_base = (unsigned char *)mmap(NULL, offset + num, PROT_READ | PROT_WRITE, MAP_SHARED, fd, base_addr);
+	if (map_base == MAP_FAILED)
+	{
+		printf("linux_write_memery Error: %s (%d)\n", strerror(errno), errno);
+		close(fd);
+		return false;
+	}
+	memcpy(map_base + offset, data, num);
+	if (fd)
+		close(fd);
+
+	munmap(map_base, num); //解除映射关系
+	return num;
+}
+
+int hi3518_adc_init(void)
+{
+	int value;
+
+	value = 0;
+	linux_write_memery(0x200F00f8, &value, 4);
+	value = 0xff0201ff;
+	linux_write_memery(0x200b0000, &value, 4);
+	value = 0x00;
+	linux_write_memery(0x200b0010, &value, 4);
+}
+
+int hi3518_adc_get(void)
+{
+	int value;
+
+	value = 0xf;
+	linux_write_memery(0x200b001c, &value, 4);
+	linux_read_memery(0x200b000c, &value, 1);
+	// printf("linux_read_memery -> %d\r\n", value);
+	return value;
+}
+
 bool set_u8(const uint32_t offset, const uint8_t value) {
+	int base_addr, addr_offset;
     int mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (mem_fd < 0) { printf("set_u8 can't open /dev/mem \n"); return false; }
+
+	addr_offset = offset % 0x1000;
+	base_addr = offset - addr_offset;
     volatile char *mmap_ptr = mmap(
-            offset,                // Any adddress in our space will do
-            1,                     // Map length
+            NULL,                // Any adddress in our space will do
+            addr_offset,                     // Map length
             PROT_WRITE,            // Enable reading & writting to mapped memory
             MAP_SHARED,            // Shared with other processes
             mem_fd,                // File to map
-            0                      // Offset to base address
+            base_addr                      // Offset to base address
     );
     if (mmap_ptr == MAP_FAILED) {
         printf("set_u8 mmap_ptr mmap error %d\n", (int)mmap_ptr);
@@ -49,21 +132,26 @@ bool set_u8(const uint32_t offset, const uint8_t value) {
         close(mem_fd);
         return false;
     }
-    mmap_ptr[0] = value;
+    mmap_ptr[addr_offset] = value;
+    munmap(mmap_ptr, addr_offset);
     close(mem_fd);
     return true;
 }
 
 bool get_u8(const uint32_t offset, uint8_t *value) {
+	int base_addr, addr_offset;
     int mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (mem_fd < 0) { printf("get_u8 can't open /dev/mem \n"); return false; }
+
+	addr_offset = offset % 0x1000;
+	base_addr = offset - addr_offset;
     volatile char *mmap_ptr = mmap(
-            offset,                // Any adddress in our space will do
-            1,                     // Map length
+            NULL,                // Any adddress in our space will do
+            addr_offset,                     // Map length
             PROT_READ,             // Enable reading & writting to mapped memory
             MAP_SHARED,            // Shared with other processes
             mem_fd,                // File to map
-            0                      // Offset to base address
+            base_addr                      // Offset to base address
     );
     if (mmap_ptr == MAP_FAILED) {
         printf("get_u8 mmap_ptr mmap error %d\n", (int)mmap_ptr);
@@ -71,7 +159,8 @@ bool get_u8(const uint32_t offset, uint8_t *value) {
         close(mem_fd);
         return false;
     }
-    *value = mmap_ptr[0];
+    *value = mmap_ptr[addr_offset];
+    munmap(mmap_ptr, addr_offset);
     close(mem_fd);
     return true;
 }
@@ -97,6 +186,7 @@ bool set_u32(const uint32_t offset, const uint32_t value) {
     mmap_ptr[1] = ((uint8_t *)&value)[1];
     mmap_ptr[2] = ((uint8_t *)&value)[2];
     mmap_ptr[3] = ((uint8_t *)&value)[3];
+    munmap(mmap_ptr, 4);
     close(mem_fd);
     return true;
 }
@@ -128,6 +218,7 @@ bool get_u32(const uint32_t offset, uint32_t *value) {
     val = val << 8;
     val += mmap_ptr[3];
     *value = val;
+    munmap(mmap_ptr, 4);
     close(mem_fd);
     return true;
 }
