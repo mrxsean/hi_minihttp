@@ -8,6 +8,8 @@
 !/minihttp.ini
 !/osdrv/include/*
 !/osdrv/lib/*
+!/mp4v2/include/*
+!/mp4v2/lib/*
 
 !.dockerignore
 !.gitignore

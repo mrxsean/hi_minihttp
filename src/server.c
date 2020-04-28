@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
@@ -39,7 +40,7 @@ struct Client {
 };
 
 // shared http video clients list
-#define MAX_CLIENTS 50
+#define MAX_CLIENTS 10
 struct Client client_fds[MAX_CLIENTS];
 pthread_mutex_t client_fds_mutex;
 
@@ -219,8 +220,11 @@ void send_mjpeg(uint8_t chn_index, char *buf, ssize_t size) {
     for (uint32_t i = 0; i < MAX_CLIENTS; ++i) {
         if (client_fds[i].socket_fd < 0) continue;
         if (client_fds[i].type != STREAM_MJPEG) continue;
-        if (send_to_client(i, prefix_buf, prefix_size) < 0) continue; // send <SIZE>\r\n
+        printf("send_mjpeg [%d] -> %d\r\n", i, size);
+        if (send_to_client(i, prefix_buf, prefix_size) < 0)
+            continue;                                   // send <SIZE>\r\n
         if (send_to_client(i, buf, size) < 0) continue; // send <DATA>\r\n
+        printf("send_mjpeg over...\r\n", i, size);
     }
     pthread_mutex_unlock(&client_fds_mutex);
 }
@@ -392,6 +396,9 @@ void *server_thread(void *vargp) {
         int client_fd = accept(server_fd, NULL, NULL);
         if (client_fd == -1) break;
 
+        struct timeval timeout = {2,0};  
+        setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(struct timeval));
+
         // parse request headers, get request path
         recv(client_fd, request_headers, MAX_HEADERS, 0);
         if(!parseRequestPath(request_headers, request_path)) { close_socket_fd(client_fd); continue; };
@@ -518,6 +525,15 @@ int start_server() {
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     {
+        int keepalive = 1; // 开启keepalive属性
+        int keepidle = 60; // 如该连接在60秒内没有任何数据往来,则进行探测
+        int keepinterval = 5; // 探测时发包的时间间隔为5 秒
+        int keepcount = 3; // 探测尝试的次数.如果第1次探测包就收到响应了,则后2次的不再发.
+        setsockopt(server_fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive ));
+        setsockopt(server_fd, SOL_TCP, TCP_KEEPIDLE, (void*)&keepidle , sizeof(keepidle ));
+        setsockopt(server_fd, SOL_TCP, TCP_KEEPINTVL, (void *)&keepinterval , sizeof(keepinterval ));
+        setsockopt(server_fd, SOL_TCP, TCP_KEEPCNT, (void *)&keepcount , sizeof(keepcount ));
+
         pthread_attr_t thread_attr;
         pthread_attr_init(&thread_attr);
         size_t stacksize;

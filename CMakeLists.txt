@@ -13,14 +13,16 @@ set(CMAKE_C_FLAGS "-std=gnu99")
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_CURRENT_SOURCE_DIR}/osdrv/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/mp4v2/include
 )
 
 link_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/osdrv/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/mp4v2/lib
 )
 
 set(HILIBS
-    isp _hiae _hiawb _hiaf _hidefog
+    isp _hiae _hiawb _hiaf _hidefog mp4v2
     pthread m dl
     ive md mpi tde upvqe dnvqe VoiceEngine
 )

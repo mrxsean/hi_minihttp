@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     int s32MainFd;
     if (app_config.rtsp_enable) {
-        ringmalloc(1920*1080);
+        ringmalloc(1280*720);
         printf("RTSP server START, listen for client connecting...\n");
         PrefsInit();
         signal(SIGINT, IntHandl);

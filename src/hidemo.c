@@ -35,6 +35,7 @@
 #include "http_post.h"
 #include "motion_detect.h"
 
+#include "mp4v2.h"
 struct SDKState state;
 
 HI_S32 HI_MPI_SYS_GetChipId(HI_U32 *pu32ChipId);
@@ -45,6 +46,112 @@ HI_VOID* Test_ISP_Run(HI_VOID *param) {
     if (HI_SUCCESS != s32Ret) { printf("HI_MPI_ISP_Run failed with %#x!\n%s\n", s32Ret, hi_errstr(s32Ret)); }
     printf("Shutdown isp_run thread\n");
     return HI_NULL;
+}
+
+typedef struct _MP4ENC_NaluUnit
+{
+	int type;
+ 	int size;
+ 	unsigned char *data;
+}MP4ENC_NaluUnit;
+
+typedef struct _MP4ENC_INFO
+{
+ 	unsigned int u32FrameRate;
+	unsigned int u32Width;
+ 	unsigned int u32Height;
+ 	unsigned int u32Profile;
+}MP4ENC_INFO;
+
+static HI_S32 Sample_MP4_ReadNalu(HI_U8 *pPack, HI_U32 nPackLen, unsigned int offSet, MP4ENC_NaluUnit *pNaluUnit)
+{
+	int i = offSet;
+	while (i < nPackLen)
+	{
+		if (pPack[i++] == 0x00 && pPack[i++] == 0x00 && pPack[i++] == 0x00 && pPack[i++] == 0x01)// 开始码
+		{
+			int pos = i;
+			while (pos < nPackLen)
+			{
+				if (pPack[pos++] == 0x00 && pPack[pos++] == 0x00 && pPack[pos++] == 0x00 && pPack[pos++] == 0x01)
+					break;
+			}
+			if (pos == nPackLen)
+				pNaluUnit->size = pos - i;
+			else
+				pNaluUnit->size = (pos - 4) - i;
+				
+			pNaluUnit->type = pPack[i] & 0x1f;
+			pNaluUnit->data = (unsigned char *)&pPack[i];
+			return (pNaluUnit->size + i - offSet);
+		}
+	}
+	return 0;
+}
+
+
+static HI_S32 Sample_MP4_WRITE(MP4FileHandle hFile, MP4TrackId *pTrackId,VENC_STREAM_S *pstStream, MP4ENC_INFO *stMp4Info)
+{
+	int i = 0;
+	for (i = 0; i < pstStream->u32PackCount; i++)
+	{
+		HI_U8 *pPack = pstStream->pstPack[i].pu8Addr + pstStream->pstPack[i].u32Offset;
+		HI_U32 nPackLen = pstStream->pstPack[i].u32Len - pstStream->pstPack[i].u32Offset;
+
+		MP4ENC_NaluUnit stNaluUnit;
+		memset(&stNaluUnit, 0, sizeof(stNaluUnit));
+		int nPos = 0, nLen = 0;
+		while ((nLen = Sample_MP4_ReadNalu(pPack, nPackLen, nPos, &stNaluUnit)) != 0)
+		{
+			switch (stNaluUnit.type)
+			{
+			case H264E_NALU_SPS:
+			if (*pTrackId == MP4_INVALID_TRACK_ID)
+     			{
+      				*pTrackId = MP4AddH264VideoTrack(hFile, 90000, 90000 / stMp4Info->u32FrameRate, stMp4Info->u32Width, stMp4Info->u32Height, stNaluUnit.data[1], stNaluUnit.data[2], stNaluUnit.data[3], 3);
+      				if (*pTrackId == MP4_INVALID_TRACK_ID)
+     				{
+       					return HI_FAILURE;
+     				}
+      				MP4SetVideoProfileLevel(hFile, stMp4Info->u32Profile);
+      				MP4AddH264SequenceParameterSet(hFile,*pTrackId,stNaluUnit.data,stNaluUnit.size);
+     			}
+     			break;
+			case H264E_NALU_PPS:
+    			if (*pTrackId == MP4_INVALID_TRACK_ID)
+     			{
+      				break;
+     			}
+			MP4AddH264PictureParameterSet(hFile,*pTrackId,stNaluUnit.data,stNaluUnit.size);
+			break;
+			case H264E_NALU_PSLICE:
+			{
+			if (*pTrackId == MP4_INVALID_TRACK_ID)
+      			{
+       				break;
+      			}
+			int nDataLen = stNaluUnit.size + 4;
+      			unsigned char *data = (unsigned char *)malloc(nDataLen);
+      			data[0] = stNaluUnit.size >> 24;
+      			data[1] = stNaluUnit.size >> 16;
+      			data[2] = stNaluUnit.size >> 8;
+      			data[3] = stNaluUnit.size & 0xff;
+      			memcpy(data + 4, stNaluUnit.data, stNaluUnit.size);
+			if (!MP4WriteSample(hFile, *pTrackId, data, nDataLen, MP4_INVALID_DURATION, 0, 1))
+      			{
+       				free(data);
+       				return HI_FAILURE;
+      			}
+			free(data);
+			}
+			break;
+			default :
+			break;
+		}
+		nPos += nLen;
+		}
+	}
+	return HI_SUCCESS;
 }
 
 HI_S32 VENC_SaveH264(int chn_index, VENC_STREAM_S *pstStream) {
@@ -94,7 +201,7 @@ HI_S32 VENC_SaveMJpeg(int chn_index, VENC_STREAM_S *pstStream) {
     return HI_SUCCESS;
 }
 HI_S32 VENC_SaveStream(int chn_index, PAYLOAD_TYPE_E enType, VENC_STREAM_S *pstStream) {
-    // printf("Chn: %d   VENC_SaveStream %d  packs: %d\n", chn_index, enType, pstStream->u32PackCount, pstStream);
+     printf("Chn: %d   VENC_SaveStream %d  packs: %d\n", chn_index, enType, pstStream->u32PackCount, pstStream);
     HI_S32 s32Ret;
     if (PT_H264 == enType) { s32Ret = VENC_SaveH264(chn_index,  pstStream); }
     else if (PT_MJPEG == enType) { s32Ret = VENC_SaveMJpeg(chn_index, pstStream); }
